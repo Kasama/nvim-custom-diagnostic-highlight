@@ -6,7 +6,7 @@ It can also apply any custom highlight to other diagnostics
 
 ![Screenshot](screenshot.png)
 
-Note that the _unused_ fields are darkened.
+Note that the _unused_ fields are darkened and other diagnostics are not changed.
 
 By default it works for _unused_ fields, but the plugin is configurable for whatever diagnostics you want
 
