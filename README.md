@@ -4,7 +4,7 @@ A simple plugin to apply a highlight group to unused variables and functions sim
 
 It can also apply any custom highlight to other diagnostics
 
-![screenshot.png][Screenshot]
+![Screenshot](screenshot.png)
 
 Note that the _unused_ fields are darkened.
 
