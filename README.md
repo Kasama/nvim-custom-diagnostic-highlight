@@ -52,6 +52,8 @@ local final_opts = {
   },
   extra_patterns = {},                                        -- Extra lua patterns to add. Does NOT override and will be added to the above
   diagnostic_handler_namespace = 'unused_hl_ns',              -- Name of the handler namespace that will contain the highlight (needs to be unique)
+  defer_until_n_lines_away = false,                           -- If set to a number, then highlighting is deferred until the cursor is N lines away from
+                                                              -- diagnostics. Useful to avoid unwanted highlights in the currently edited position.
 }
 ```
 

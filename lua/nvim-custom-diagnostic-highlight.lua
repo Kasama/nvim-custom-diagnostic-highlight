@@ -5,6 +5,7 @@
 ---@tag nvim-custom-diagnostic-highlight
 
 local nvim_custom_diagnostic_highlight = {}
+local augroup = vim.api.nvim_create_augroup('NvimCustomDiagnosticHighlight', { clear = true })
 
 local any = function(fun, param)
     local r = false
@@ -23,6 +24,42 @@ local function get_bufnr(bufnr)
   return bufnr
 end
 
+-- Each diagnostic namespace stores user data, we store our data under user_data[diagnostic_handler_namespace]
+local function get_user_data(diagnostic_ns, handler_ns)
+  local data = diagnostic_ns.user_data[handler_ns]
+  if not data then
+    data = {
+      -- Anonymous namespace used for highlights
+      hl_namespace = vim.api.nvim_create_namespace(''),
+      -- Autocommands used for deferring highlights, stored to remove them in hide() handler
+      -- Just clearing augroup wouldn't work because we need to do this on per-namespace-per-buffer basis
+      -- It is a map of sets: { buf1 = { id1 = true, id2 = true, ... } }
+      autocmds = {},
+    }
+    diagnostic_ns.user_data[handler_ns] = data
+  end
+  return data
+end
+
+-- Generate a function that, when called, will check if in windows belonging to `bufnr`
+-- we are outside of the n-lines range around the range denoted by (lnum, end_lnum).
+local function is_n_lines_away(bufnr, n_lines, lnum, end_lnum)
+  end_lnum = end_lnum or lnum
+  local is_win = function(win)
+    local row, col = unpack(vim.api.nvim_win_get_cursor(win))
+    return row <= (lnum + 1) - n_lines or row >= (end_lnum + 1) + n_lines
+  end
+  return function(windows)
+    for _, win in ipairs(windows) do
+      if vim.api.nvim_win_get_buf(win) == bufnr then
+        if is_win(win) then
+          return true
+        end
+      end
+    end
+  end
+end
+
 nvim_custom_diagnostic_highlight.setup = function(plugin_opts)
 
   local final_opts = {
@@ -32,6 +69,7 @@ nvim_custom_diagnostic_highlight.setup = function(plugin_opts)
     patterns_override = {'%sunused', '^unused', 'not used', 'never used', 'not read', 'never read', 'empty block'},
     extra_patterns = {},
     diagnostic_handler_namespace = 'unused_hl_ns',
+    defer_until_n_lines_away = false,
   }
 
   for k, v in pairs(plugin_opts) do
@@ -63,27 +101,67 @@ nvim_custom_diagnostic_highlight.setup = function(plugin_opts)
         )
 
         local diagnostic_namespace = vim.diagnostic.get_namespace(namespace)
-        if not diagnostic_namespace.user_data[final_opts.diagnostic_handler_namespace] then
-          diagnostic_namespace.user_data[final_opts.diagnostic_handler_namespace] = vim.api.nvim_create_namespace("")
-        end
+        local user_data = get_user_data(diagnostic_namespace, final_opts.diagnostic_handler_namespace)
 
         if should_highlight_diagnostic then
-          vim.highlight.range(
-            bufnr,
-            diagnostic_namespace.user_data[final_opts.diagnostic_handler_namespace],
-            higroup,
-            { diagnostic.lnum, diagnostic.col },
-            { diagnostic.end_lnum, diagnostic.end_col },
-            { priority = vim.highlight.priorities.diagnostics }
-          )
+          local set_highlight = function()
+            vim.highlight.range(
+              bufnr,
+              user_data.hl_namespace,
+              higroup,
+              { diagnostic.lnum, diagnostic.col },
+              { diagnostic.end_lnum, diagnostic.end_col },
+              { priority = vim.highlight.priorities.diagnostics }
+            )
+          end
+          local should_highlight = final_opts.defer_until_n_lines_away and
+            is_n_lines_away(bufnr, final_opts.defer_until_n_lines_away, diagnostic.lnum, diagnostic.end_lnum)
+
+          -- Defer if deferred highlighting is enabled and highlighting cannot be done now
+          -- Even here it's better to only check the current window, because user most likely
+          -- cares only for the position they are currently editing.
+          local defer = should_highlight and not should_highlight({ vim.api.nvim_get_current_win() })
+
+          if not defer then
+            set_highlight()
+          else
+            -- Store creates autocmds in user data to later delete those that didn't delete themselves
+            if not user_data.autocmds[bufnr] then
+              user_data.autocmds[bufnr] = {}
+            end
+            local autocmds_set = user_data.autocmds[bufnr]
+
+            local id
+            id = vim.api.nvim_create_autocmd('CursorMoved', {
+              group = augroup,
+              buffer = bufnr,
+              desc = 'Deferred custom diagnostic highlight',
+              callback = function()
+                -- No need to check other windows because cursor moves only in the current window
+                -- (or at least, user moves their cursor _explicitly_ only in the current window).
+                if should_highlight({ vim.api.nvim_get_current_win() }) then
+                  set_highlight()
+                  -- Delete this autocmd by returning true and remove it from our set
+                  autocmds_set[id] = nil
+                  return true
+                end
+              end
+            })
+            autocmds_set[id] = true
+          end
         end
       end
     end,
     hide = function(namespace, bufnr)
       local ns = vim.diagnostic.get_namespace(namespace)
-      if ns.user_data[final_opts.diagnostic_handler_namespace] then
-        vim.api.nvim_buf_clear_namespace(bufnr, ns.user_data[final_opts.diagnostic_handler_namespace], 0, -1)
+      local user_data = get_user_data(ns, final_opts.diagnostic_handler_namespace)
+
+      vim.api.nvim_buf_clear_namespace(bufnr, user_data.hl_namespace, 0, -1)
+
+      for id, _ in pairs(user_data.autocmds[bufnr] or {}) do
+        vim.api.nvim_del_autocmd(id)
       end
+      user_data.autocmds[bufnr] = {}
     end,
   }
 
