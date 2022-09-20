@@ -159,7 +159,7 @@ nvim_custom_diagnostic_highlight.setup = function(plugin_opts)
       vim.api.nvim_buf_clear_namespace(bufnr, user_data.hl_namespace, 0, -1)
 
       for id, _ in pairs(user_data.autocmds[bufnr] or {}) do
-        vim.api.nvim_del_autocmd(id)
+        pcall(vim.api.nvim_del_autocmd, id)
       end
       user_data.autocmds[bufnr] = {}
     end,
