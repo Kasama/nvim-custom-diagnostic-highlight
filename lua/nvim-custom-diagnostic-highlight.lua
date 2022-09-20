@@ -41,22 +41,19 @@ local function get_user_data(diagnostic_ns, handler_ns)
   return data
 end
 
--- Generate a function that, when called, will check if in windows belonging to `bufnr`
--- we are outside of the n-lines range around the range denoted by (lnum, end_lnum).
+-- Generate a function that, when called, will check if cursor is currently outside
+-- of the n-lines range around the diagnostic at (lnum, end_lnum).
 local function is_n_lines_away(bufnr, n_lines, lnum, end_lnum)
   end_lnum = end_lnum or lnum
-  local is_win = function(win)
-    local row, col = unpack(vim.api.nvim_win_get_cursor(win))
-    return row <= (lnum + 1) - n_lines or row >= (end_lnum + 1) + n_lines
-  end
-  return function(windows)
-    for _, win in ipairs(windows) do
-      if vim.api.nvim_win_get_buf(win) == bufnr then
-        if is_win(win) then
-          return true
-        end
-      end
+  return function()
+    -- When we are in a different buffer, then this means we are not at that diagnostic
+    if vim.api.nvim_get_current_buf() ~= bufnr then
+      return true
     end
+    -- Else check cursor position in current window. We don't care for other windows
+    -- because user most likely cares only about the current editing position.
+    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+    return row <= (lnum + 1) - n_lines or row >= (end_lnum + 1) + n_lines
   end
 end
 
@@ -121,7 +118,7 @@ nvim_custom_diagnostic_highlight.setup = function(plugin_opts)
           -- Defer if deferred highlighting is enabled and highlighting cannot be done now
           -- Even here it's better to only check the current window, because user most likely
           -- cares only for the position they are currently editing.
-          local defer = should_highlight and not should_highlight({ vim.api.nvim_get_current_win() })
+          local defer = should_highlight and not should_highlight()
 
           if not defer then
             set_highlight()
@@ -135,12 +132,14 @@ nvim_custom_diagnostic_highlight.setup = function(plugin_opts)
             local id
             id = vim.api.nvim_create_autocmd(final_opts.defer_highlight_update_events, {
               group = augroup,
-              buffer = bufnr,
+              -- Do not set buffer=bufnr, because we want this to activate when user jumps out of
+              -- the current buf and if this autocmd was created on CursorHold, then it wouldn't fire.
+              -- Note that for deletion we still want to store autocmd ID in user_data.autocmds[bufnr].
               desc = 'Deferred custom diagnostic highlight',
               callback = function()
                 -- No need to check other windows because cursor moves only in the current window
                 -- (or at least, user moves their cursor _explicitly_ only in the current window).
-                if should_highlight({ vim.api.nvim_get_current_win() }) then
+                if should_highlight() then
                   set_highlight()
                   -- Delete this autocmd by returning true and remove it from our set
                   autocmds_set[id] = nil
