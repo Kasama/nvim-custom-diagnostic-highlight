@@ -70,6 +70,7 @@ nvim_custom_diagnostic_highlight.setup = function(plugin_opts)
     extra_patterns = {},
     diagnostic_handler_namespace = 'unused_hl_ns',
     defer_until_n_lines_away = false,
+    defer_highlight_update_events = { 'CursorHold', 'CursorHoldI' },
   }
 
   for k, v in pairs(plugin_opts) do
@@ -132,7 +133,7 @@ nvim_custom_diagnostic_highlight.setup = function(plugin_opts)
             local autocmds_set = user_data.autocmds[bufnr]
 
             local id
-            id = vim.api.nvim_create_autocmd('CursorMoved', {
+            id = vim.api.nvim_create_autocmd(final_opts.defer_highlight_update_events, {
               group = augroup,
               buffer = bufnr,
               desc = 'Deferred custom diagnostic highlight',
