@@ -8,12 +8,12 @@ local nvim_custom_diagnostic_highlight = {}
 local augroup = vim.api.nvim_create_augroup('NvimCustomDiagnosticHighlight', { clear = true })
 
 local any = function(fun, param)
-    local r = false
-    for _, v in ipairs(param) do
-      r = r or fun(v)
-      if r then break end
-    end
-    return r
+  local r = false
+  for _, v in ipairs(param) do
+    r = r or fun(v)
+    if r then break end
+  end
+  return r
 end
 
 -- Excerpt from neovim code
@@ -63,7 +63,7 @@ nvim_custom_diagnostic_highlight.setup = function(plugin_opts)
     register_handler = true,
     handler_name = 'kasama/nvim-custom-diagnostic-highlight',
     highlight_group = 'Conceal',
-    patterns_override = {'%sunused', '^unused', 'not used', 'never used', 'not read', 'never read', 'empty block'},
+    patterns_override = { '%sunused', '^unused', 'not used', 'never used', 'not read', 'never read', 'empty block' },
     extra_patterns = {},
     diagnostic_handler_namespace = 'unused_hl_ns',
     defer_until_n_lines_away = false,
@@ -113,7 +113,7 @@ nvim_custom_diagnostic_highlight.setup = function(plugin_opts)
             )
           end
           local should_highlight = final_opts.defer_until_n_lines_away and
-            is_n_lines_away(bufnr, final_opts.defer_until_n_lines_away, diagnostic.lnum, diagnostic.end_lnum)
+              is_n_lines_away(bufnr, final_opts.defer_until_n_lines_away, diagnostic.lnum, diagnostic.end_lnum)
 
           -- Defer if deferred highlighting is enabled and highlighting cannot be done now
           -- Even here it's better to only check the current window, because user most likely
@@ -156,7 +156,7 @@ nvim_custom_diagnostic_highlight.setup = function(plugin_opts)
       local ns = vim.diagnostic.get_namespace(namespace)
       local user_data = get_user_data(ns, final_opts.diagnostic_handler_namespace)
 
-      vim.api.nvim_buf_clear_namespace(bufnr, user_data.hl_namespace, 0, -1)
+      pcall(vim.api.nvim_buf_clear_namespace, bufnr, user_data.hl_namespace, 0, -1)
 
       for id, _ in pairs(user_data.autocmds[bufnr] or {}) do
         pcall(vim.api.nvim_del_autocmd, id)
