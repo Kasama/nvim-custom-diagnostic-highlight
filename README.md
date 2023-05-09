@@ -48,7 +48,7 @@ local final_opts = {
   highlight_group = 'Conceal',                                -- The Highlight group to set at the diagnostic
   patterns_override = {                                       -- Lua patterns to be tested against the diagnostic message. Overrides default behavior
     '%sunused', '^unused', 'not used', 'never used',
-    'not read', 'never read', 'empty block'
+    'not read', 'never read', 'empty block', 'not accessed'
   },
   extra_patterns = {},                                        -- Extra lua patterns to add. Does NOT override and will be added to the above
   diagnostic_handler_namespace = 'unused_hl_ns',              -- Name of the handler namespace that will contain the highlight (needs to be unique)
